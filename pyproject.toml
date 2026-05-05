@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "confpatch"
+version = "0.1.0"
+description = "Minimal utility to apply structured patches to YAML/TOML config files"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["config", "yaml", "toml", "patch"]
+
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+toml = [
+    "tomli>=2.0; python_version < '3.11'",
+    "tomli-w>=1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "PyYAML>=6.0",
+    "tomli>=2.0; python_version < '3.11'",
+    "tomli-w>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["confpatch*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
