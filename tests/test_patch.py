@@ -65,3 +65,11 @@ def test_apply_patch_deep_nested():
     patch = {"a.b.c": 42}
     result = apply_patch(config, patch)
     assert result["a"]["b"]["c"] == 42
+
+
+def test_apply_patch_empty_patch():
+    """Applying an empty patch should return a copy of the original config unchanged."""
+    config = {"host": "localhost", "port": 5432}
+    result = apply_patch(config, {})
+    assert result == config
+    assert result is not config
