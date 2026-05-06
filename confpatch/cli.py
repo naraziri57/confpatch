@@ -1,30 +1,26 @@
-"""Minimal CLI for confpatch.
+"""CLI entry point for confpatch."""
 
-Usage:
-    confpatch apply <config_file> <patch_file> [--output <out_file>] [--format yaml|toml]
-"""
+from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
 from confpatch.loaders import load_config, save_config
-from confpatch.patch import apply_patch, load_patch
-from confpatch.validator import (
-    PatchValidationError,
-    validate_format,
-    validate_keys,
-    validate_patch_structure,
-)
+from confpatch.patch import load_patch, apply_patch
+from confpatch.validator import validate_patch_structure, validate_keys, PatchValidationError
+from confpatch.diff import compute_diff, format_diff
+from confpatch.cli_backup import register_backup_commands
+from confpatch.cli_rollback import register_rollback_commands
 
 
 def _detect_format(path: Path) -> str:
-    suffix = path.suffix.lower().lstrip(".")
-    if suffix in ("yml", "yaml"):
+    suffix = path.suffix.lower()
+    if suffix in (".yaml", ".yml"):
         return "yaml"
-    if suffix == "toml":
+    if suffix == ".toml":
         return "toml"
-    return "yaml"
+    raise ValueError(f"Cannot detect format from extension: {suffix}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,19 +28,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="confpatch",
         description="Apply structured patches to YAML/TOML config files.",
     )
-    sub = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    apply_cmd = sub.add_parser("apply", help="Apply a patch file to a config file")
-    apply_cmd.add_argument("config", help="Path to the config file")
-    apply_cmd.add_argument("patch", help="Path to the patch file")
-    apply_cmd.add_argument(
-        "--output", "-o", default=None,
-        help="Output path (defaults to overwriting the config file)",
-    )
-    apply_cmd.add_argument(
-        "--format", "-f", default=None, choices=("yaml", "toml"),
-        help="Force a specific format (auto-detected from extension by default)",
-    )
+    # apply subcommand
+    apply_parser = subparsers.add_parser("apply", help="Apply a patch to a config file")
+    apply_parser.add_argument("config", help="Path to the config file")
+    apply_parser.add_argument("patch", help="Path to the patch file (JSON/YAML)")
+    apply_parser.add_argument("--format", choices=["yaml", "toml"], default=None)
+    apply_parser.add_argument("--dry-run", action="store_true", default=False)
+    apply_parser.add_argument("--no-backup", action="store_true", default=False)
+    apply_parser.set_defaults(func=cmd_apply)
+
+    register_backup_commands(subparsers)
+    register_rollback_commands(subparsers)
+
     return parser
 
 
@@ -52,35 +49,46 @@ def cmd_apply(args: argparse.Namespace) -> int:
     config_path = Path(args.config)
     patch_path = Path(args.patch)
 
+    if not config_path.exists():
+        print(f"Error: config file not found: {config_path}")
+        return 1
+    if not patch_path.exists():
+        print(f"Error: patch file not found: {patch_path}")
+        return 1
+
     fmt = args.format or _detect_format(config_path)
 
     try:
-        validate_format(fmt)
-        config = load_config(config_path, fmt=fmt)
+        config = load_config(config_path, fmt)
         patch = load_patch(patch_path)
         validate_patch_structure(patch)
         validate_keys(patch)
-        updated = apply_patch(config, patch)
-    except (PatchValidationError, ValueError, FileNotFoundError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+    except (PatchValidationError, ValueError) as exc:
+        print(f"Validation error: {exc}")
         return 1
 
-    out_path = Path(args.output) if args.output else config_path
-    save_config(updated, out_path, fmt=fmt)
-    print(f"Patched {config_path} -> {out_path}")
+    patched = apply_patch(config, patch)
+    diff = compute_diff(config, patched)
+
+    if args.dry_run:
+        print(format_diff(diff))
+        return 0
+
+    if not args.no_backup:
+        from confpatch.backup import create_backup
+        create_backup(config_path)
+
+    save_config(config_path, patched, fmt)
+    print(format_diff(diff))
+    print(f"Patch applied to {config_path}.")
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def main() -> None:
     parser = build_parser()
-    args = parser.parse_args(argv)
-
-    if args.command == "apply":
-        return cmd_apply(args)
-
-    parser.print_help()
-    return 0
+    args = parser.parse_args()
+    sys.exit(args.func(args))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
