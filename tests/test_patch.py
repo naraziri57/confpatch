@@ -73,3 +73,11 @@ def test_apply_patch_empty_patch():
     result = apply_patch(config, {})
     assert result == config
     assert result is not config
+
+
+def test_apply_patch_disallow_new_keys_dot_notation_raises():
+    """Dot-notation keys that would create new nested paths should also raise when allow_new_keys=False."""
+    config = {"database": {"host": "localhost"}}
+    patch = {"database.port": 5432}
+    with pytest.raises(KeyError, match="port"):
+        apply_patch(config, patch, allow_new_keys=False)
