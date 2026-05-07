@@ -1,0 +1,21 @@
+# Example schema definition for confpatch schema validation.
+#
+# Each key maps to either:
+#   - a type string: "str" | "int" | "float" | "bool" | "list" | "dict"
+#   - a nested mapping (for nested config sections)
+#
+# Usage:
+#   confpatch validate-schema config.yaml examples/schema_example.yaml
+
+app_name: str
+debug: bool
+workers: int
+
+database:
+  host: str
+  port: int
+  name: str
+
+logging:
+  level: str
+  file: str
