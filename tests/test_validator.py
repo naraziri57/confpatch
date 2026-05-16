@@ -31,6 +31,16 @@ def test_validate_patch_structure_none():
         validate_patch_structure(None)
 
 
+def test_validate_patch_structure_integer():
+    with pytest.raises(PatchValidationError, match="mapping"):
+        validate_patch_structure(42)
+
+
+def test_validate_patch_structure_string():
+    with pytest.raises(PatchValidationError, match="mapping"):
+        validate_patch_structure("key=value")
+
+
 # --- validate_keys ---
 
 def test_validate_keys_valid():
@@ -67,6 +77,12 @@ def test_validate_keys_multiple_keys_one_invalid():
         validate_keys({"valid_key": 1, 42: "oops"})
 
 
+def test_validate_keys_none_key():
+    """None is not a valid string key."""
+    with pytest.raises(PatchValidationError, match="strings"):
+        validate_keys({None: "value"})
+
+
 # --- validate_format ---
 
 def test_validate_format_yaml():
@@ -91,3 +107,9 @@ def test_validate_format_case_sensitive():
     """Format names should be treated as case-sensitive (e.g. 'YAML' is not valid)."""
     with pytest.raises(PatchValidationError, match="Unsupported"):
         validate_format("YAML")
+
+
+def test_validate_format_toml_uppercase():
+    """'TOML' should also be rejected due to case-sensitivity."""
+    with pytest.raises(PatchValidationError, match="Unsupported"):
+        validate_format("TOML")
