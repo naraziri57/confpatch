@@ -31,10 +31,16 @@ def make_args(**kwargs):
     return SimpleNamespace(**defaults)
 
 
-def test_cmd_pipeline_success(config_file: Path, patch_file: Path, tmp_path: Path) -> None:
-    steps = [{"name": "bump", "type": "patch", "patch_file": str(patch_file)}]
+def make_steps_file(tmp_path: Path, steps: object) -> Path:
+    """Write *steps* as JSON to a temp file and return its path."""
     steps_file = tmp_path / "steps.json"
     steps_file.write_text(json.dumps(steps))
+    return steps_file
+
+
+def test_cmd_pipeline_success(config_file: Path, patch_file: Path, tmp_path: Path) -> None:
+    steps = [{"name": "bump", "type": "patch", "patch_file": str(patch_file)}]
+    steps_file = make_steps_file(tmp_path, steps)
     args = make_args(config=str(config_file), steps_file=str(steps_file))
     rc = cmd_pipeline(args)
     assert rc == 0
@@ -55,16 +61,14 @@ def test_cmd_pipeline_invalid_json(config_file: Path, tmp_path: Path) -> None:
 
 
 def test_cmd_pipeline_steps_not_list(config_file: Path, tmp_path: Path) -> None:
-    steps_file = tmp_path / "steps.json"
-    steps_file.write_text(json.dumps({"step": "oops"}))
+    steps_file = make_steps_file(tmp_path, {"step": "oops"})
     args = make_args(config=str(config_file), steps_file=str(steps_file))
     rc = cmd_pipeline(args)
     assert rc == 1
 
 
 def test_cmd_pipeline_config_not_found(tmp_path: Path) -> None:
-    steps_file = tmp_path / "steps.json"
-    steps_file.write_text(json.dumps([]))
+    steps_file = make_steps_file(tmp_path, [])
     args = make_args(config=str(tmp_path / "missing.yaml"), steps_file=str(steps_file))
     rc = cmd_pipeline(args)
     assert rc == 1
@@ -73,8 +77,7 @@ def test_cmd_pipeline_config_not_found(tmp_path: Path) -> None:
 def test_cmd_pipeline_dry_run(config_file: Path, patch_file: Path, tmp_path: Path) -> None:
     original = config_file.read_text()
     steps = [{"name": "bump", "type": "patch", "patch_file": str(patch_file)}]
-    steps_file = tmp_path / "steps.json"
-    steps_file.write_text(json.dumps(steps))
+    steps_file = make_steps_file(tmp_path, steps)
     args = make_args(config=str(config_file), steps_file=str(steps_file), dry_run=True)
     rc = cmd_pipeline(args)
     assert rc == 0
