@@ -61,6 +61,12 @@ def test_validate_keys_whitespace_key():
         validate_keys({"   ": "value"})
 
 
+def test_validate_keys_multiple_keys_one_invalid():
+    """Ensure validation catches an invalid key even when other keys are valid."""
+    with pytest.raises(PatchValidationError, match="strings"):
+        validate_keys({"valid_key": 1, 42: "oops"})
+
+
 # --- validate_format ---
 
 def test_validate_format_yaml():
@@ -79,3 +85,9 @@ def test_validate_format_unsupported():
 def test_validate_format_empty_string():
     with pytest.raises(PatchValidationError, match="Unsupported"):
         validate_format("")
+
+
+def test_validate_format_case_sensitive():
+    """Format names should be treated as case-sensitive (e.g. 'YAML' is not valid)."""
+    with pytest.raises(PatchValidationError, match="Unsupported"):
+        validate_format("YAML")
